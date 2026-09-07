@@ -22,6 +22,8 @@ export interface VolumeInfo {
   totalSize?: number;
   internal: boolean;
   removable: boolean;
+  /** A network share, unmounted rather than ejected. */
+  network: boolean;
 }
 
 export interface UsbDevice {

@@ -35,8 +35,8 @@ locally.
 ## Commands
 
 - **Eject Device** — one list with connected devices and mounted disks. `Enter` ejects.
-- **Eject All Disks** — unmounts every ejectable disk at once. Leaves devices connected on
-  purpose, since ejecting a device pulls Finder forward.
+- **Eject All Disks** — unmounts every disk, disk image and network share at once. Leaves
+  devices connected on purpose, since ejecting a device pulls Finder forward.
 - **Diagnose Finder Sidebar** — dumps what each source reported plus the accessibility tree of
   the Finder window. Use it if a device is not detected; the report is copyable.
 

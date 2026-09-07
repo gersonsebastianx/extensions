@@ -1,14 +1,15 @@
 import { Toast, showToast } from "@raycast/api";
 
-import { listEjectableVolumes, ejectVolume } from "./lib/volumes";
+import { listAllEjectableVolumes, ejectVolume } from "./lib/volumes";
 
 /**
- * Unmounts every ejectable volume. Deliberately limited to disks: an iPhone is
- * ejected through Finder's UI, which is slow and focus-stealing, and nobody
- * wants that fired off in bulk from a no-view command.
+ * Unmounts every ejectable volume: external media, mounted disk images and
+ * network shares. Deliberately excludes devices -- an iPhone is ejected through
+ * Finder's UI, which is slow and pulls Finder forward, and nobody wants that
+ * fired off in bulk from a no-view command.
  */
 export default async function Command() {
-  const volumes = await listEjectableVolumes();
+  const volumes = await listAllEjectableVolumes();
 
   if (volumes.length === 0) {
     await showToast({ style: Toast.Style.Success, title: "No disks to eject" });

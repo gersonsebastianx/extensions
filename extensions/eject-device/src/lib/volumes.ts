@@ -7,6 +7,62 @@ import { VolumeInfo } from "./types";
 
 const execFileAsync = promisify(execFile);
 
+/** Filesystems that live on another machine rather than on a bus. */
+const NETWORK_FILESYSTEMS = new Set(["smbfs", "afpfs", "nfs", "webdav", "ftp", "ftpfs"]);
+
+/**
+ * Everything ejectable, from both sources that matter: local media through
+ * diskutil -- USB sticks, SD cards, external SSDs and mounted disk images
+ * alike, since a .dmg reports as Ejectable with a "Disk Image" bus -- and
+ * network shares through mount, which diskutil does not describe at all.
+ */
+export async function listAllEjectableVolumes(): Promise<VolumeInfo[]> {
+  const [local, network] = await Promise.all([listEjectableVolumes(), listNetworkMounts()]);
+
+  // A share under /Volumes can surface in both passes; the local one wins
+  // because it carries the richer diskutil metadata.
+  const byMountPoint = new Map<string, VolumeInfo>();
+  for (const volume of [...network, ...local]) {
+    byMountPoint.set(volume.mountPoint, volume);
+  }
+  return [...byMountPoint.values()];
+}
+
+/**
+ * Mounted network shares, read from `mount`. diskutil cannot describe them, so
+ * without this pass a mounted server disappears from the list whenever Finder's
+ * sidebar is unreadable.
+ */
+export async function listNetworkMounts(): Promise<VolumeInfo[]> {
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync("/sbin/mount", [], { timeout: 10_000 }));
+  } catch {
+    return [];
+  }
+
+  const mounts: VolumeInfo[] = [];
+  for (const line of stdout.split("\n")) {
+    // "//user@host/share on /Volumes/share (smbfs, nodev, nosuid, mounted by x)"
+    const match = line.match(/^(.+?) on (.+?) \(([^,)]+)/);
+    if (!match) continue;
+
+    const [, source, mountPoint, fsType] = match;
+    if (!NETWORK_FILESYSTEMS.has(fsType.trim())) continue;
+
+    mounts.push({
+      name: mountPoint.split("/").pop() || mountPoint,
+      mountPoint,
+      busProtocol: fsType.trim().replace(/fs$/, "").toUpperCase(),
+      internal: false,
+      removable: false,
+      network: true,
+      deviceNode: source,
+    });
+  }
+  return mounts;
+}
+
 /**
  * Everything mounted under /Volumes that diskutil reports as ejectable. That
  * filter is what keeps the boot volume off the list without hard-coding names.
@@ -44,11 +100,19 @@ async function readVolumeInfo(mountPoint: string): Promise<VolumeInfo | null> {
     totalSize: typeof parsed.TotalSize === "number" ? parsed.TotalSize : undefined,
     internal: parsed.Internal === true,
     removable: parsed.RemovableMedia === true,
+    network: false,
   };
 }
 
-/** Unmounts a volume. The device node is preferred: it survives odd names. */
+/**
+ * Detaches a volume. A network share has no media to eject, so it is unmounted;
+ * local media is ejected by device node, which survives an odd volume name.
+ */
 export async function ejectVolume(volume: VolumeInfo): Promise<void> {
+  if (volume.network) {
+    await execFileAsync("/usr/sbin/diskutil", ["unmount", volume.mountPoint], { timeout: 60_000 });
+    return;
+  }
   const target = volume.deviceNode ?? volume.mountPoint;
   await execFileAsync("/usr/sbin/diskutil", ["eject", target], { timeout: 60_000 });
 }

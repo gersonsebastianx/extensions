@@ -1,7 +1,7 @@
 import { getPreferenceValues } from "@raycast/api";
 
 import { readSidebar, ejectSidebarItem, SidebarRow } from "./sidebar";
-import { listEjectableVolumes, ejectVolume } from "./volumes";
+import { listAllEjectableVolumes, ejectVolume } from "./volumes";
 import { listConnectedIosDevices } from "./usb";
 import { Ejectable, Preferences, SidebarStatus, UsbDevice } from "./types";
 
@@ -21,7 +21,7 @@ export interface EjectableList {
 export async function loadEjectables(): Promise<EjectableList> {
   const [sidebar, volumes, iosDevices] = await Promise.all([
     readSidebar(),
-    listEjectableVolumes(),
+    listAllEjectableVolumes(),
     listConnectedIosDevices(),
   ]);
 

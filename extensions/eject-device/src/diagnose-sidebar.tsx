@@ -4,7 +4,7 @@ import { usePromise } from "@raycast/utils";
 import { ACCESSIBILITY_SETTINGS_URL, AUTOMATION_SETTINGS_URL } from "./lib/applescript";
 import { dumpSidebarTree, readSidebar } from "./lib/sidebar";
 import { listConnectedIosDevices } from "./lib/usb";
-import { listEjectableVolumes } from "./lib/volumes";
+import { listAllEjectableVolumes } from "./lib/volumes";
 
 /**
  * Finder's sidebar is read through the accessibility tree, whose shape has
@@ -17,7 +17,7 @@ export default function Command() {
     const [sidebar, tree, volumes, devices] = await Promise.all([
       readSidebar(),
       dumpSidebarTree(),
-      listEjectableVolumes(),
+      listAllEjectableVolumes(),
       listConnectedIosDevices(),
     ]);
     return { sidebar, tree, volumes, devices };
@@ -42,7 +42,7 @@ export default function Command() {
 interface Report {
   sidebar: Awaited<ReturnType<typeof readSidebar>>;
   tree: Awaited<ReturnType<typeof dumpSidebarTree>>;
-  volumes: Awaited<ReturnType<typeof listEjectableVolumes>>;
+  volumes: Awaited<ReturnType<typeof listAllEjectableVolumes>>;
   devices: Awaited<ReturnType<typeof listConnectedIosDevices>>;
 }
 
@@ -61,7 +61,7 @@ function renderReport(data: Report): string {
       ? "_No rows read. The sidebar could not be reached._"
       : sidebar.rows.map((row) => `- ${row.ejectable ? "⏏︎" : "  "} \`${row.name}\``).join("\n"),
     "",
-    "## Ejectable volumes (diskutil)",
+    "## Ejectable volumes (diskutil + network mounts)",
     "",
     volumes.length === 0
       ? "_None mounted._"
