@@ -12,6 +12,7 @@
 - Remove an ejected row immediately rather than waiting for a reload
 - Confirm "Eject All Disks" against the names of everything it is about to touch
 - Confirm an ejected item actually left the sidebar, instead of trusting the click
+- Show why a script failed rather than the command line that failed
 - Wait for Finder's sidebar to be ready, so the first eject works rather than the second
 - Tell an eject button from an iCloud sync button, so folders never offer to eject
 - Classify permission errors by numeric code, so they are recognised in any language
