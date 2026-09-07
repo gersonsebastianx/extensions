@@ -20,6 +20,11 @@ export interface VolumeInfo {
   deviceNode?: string;
   busProtocol?: string;
   totalSize?: number;
+  freeSpace?: number;
+  /** "APFS", "ExFAT", "SMB"... whatever the volume is formatted as. */
+  filesystem?: string;
+  /** The hardware behind the volume, e.g. "SanDisk Ultra Media". */
+  mediaName?: string;
   internal: boolean;
   removable: boolean;
   /** A network share, unmounted rather than ejected. */

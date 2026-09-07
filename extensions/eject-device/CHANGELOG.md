@@ -7,4 +7,8 @@
 - Unmount network shares (SMB, AFP, NFS, WebDAV), which `diskutil` cannot describe
 - Distinguish the Automation and Accessibility permissions and link to the right settings pane
 - Add "Eject All Disks" for unmounting every ejectable disk at once
+- Group the list by kind, with icons that tell a disk image from a card, a stick or a share
+- Add a detail panel with capacity, free space, format, connection and mount point
+- Remove an ejected row immediately rather than waiting for a reload
+- Confirm "Eject All Disks" against the names of everything it is about to touch
 - Add "Diagnose Finder Sidebar" to troubleshoot detection on unfamiliar macOS layouts

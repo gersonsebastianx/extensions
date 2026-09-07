@@ -1,4 +1,4 @@
-import { Toast, showToast } from "@raycast/api";
+import { Alert, Icon, Toast, confirmAlert, showToast } from "@raycast/api";
 
 import { listAllEjectableVolumes, ejectVolume } from "./lib/volumes";
 
@@ -15,6 +15,16 @@ export default async function Command() {
     await showToast({ style: Toast.Style.Success, title: "No disks to eject" });
     return;
   }
+
+  // A bulk action gets an explicit list of what it is about to touch. Reading
+  // the names beats trusting a count.
+  const confirmed = await confirmAlert({
+    title: `Eject ${volumes.length} ${volumes.length === 1 ? "disk" : "disks"}?`,
+    message: volumes.map((volume) => volume.name).join(", "),
+    icon: Icon.Eject,
+    primaryAction: { title: "Eject All", style: Alert.ActionStyle.Destructive },
+  });
+  if (!confirmed) return;
 
   const toast = await showToast({
     style: Toast.Style.Animated,
