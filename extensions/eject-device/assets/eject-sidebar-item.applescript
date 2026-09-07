@@ -16,7 +16,8 @@ on run argv
 		end if
 	end tell
 
-	set ejected to false
+	set foundRow to false
+	set clicked to false
 
 	tell application "System Events"
 		if not (exists process "Finder") then error "Finder is not running."
@@ -26,6 +27,7 @@ on run argv
 
 			repeat with theRow in (rows of sidebarOutline)
 				if my nameOfRow(theRow) is targetName then
+					set foundRow to true
 					-- Preferred route: click the row's own eject button. It does not
 					-- steal focus and it is exactly what a click in Finder does.
 					-- The eject button is the one carrying a title; a row can also
@@ -35,12 +37,12 @@ on run argv
 						repeat with b in (buttons of UI element 1 of theRow)
 							if my hasTitle(b) then
 								click b
-								set ejected to true
+								set clicked to true
 								exit repeat
 							end if
 						end repeat
 					end try
-					if not ejected then
+					if not clicked then
 						try
 							repeat with b in (buttons of theRow)
 								if my hasTitle(b) then
@@ -53,13 +55,13 @@ on run argv
 					end if
 					-- Fallback: select the row and press Command-E. Keystrokes go to
 					-- the front app, so Finder has to come forward for this one.
-					if not ejected then
+					if not clicked then
 						try
 							set selected of theRow to true
 							tell application "Finder" to activate
 							delay 0.3
 							keystroke "e" using command down
-							set ejected to true
+							set clicked to true
 						end try
 					end if
 					exit repeat
@@ -68,16 +70,48 @@ on run argv
 		end tell
 	end tell
 
+	-- A click that lands on nothing looks exactly like one that works, so the
+	-- row has to be seen leaving before this reports success. Announcing an
+	-- eject that did not happen is worse than reporting the failure.
+	set confirmed to false
+	if clicked then
+		repeat 25 times
+			delay 0.2
+			if not my rowStillPresent(targetName) then
+				set confirmed to true
+				exit repeat
+			end if
+		end repeat
+	end if
+
 	if didOpenWindow then
 		try
-			delay 0.5
 			tell application "Finder" to close front Finder window
 		end try
 	end if
 
-	if not ejected then error "Could not find \"" & targetName & "\" in the Finder sidebar."
+	if not foundRow then error "\"" & targetName & "\" is no longer in the Finder sidebar."
+	if not clicked then error "Found \"" & targetName & "\" but it has no eject button."
+	if not confirmed then error "Clicked eject on \"" & targetName & "\" but Finder still lists it."
 	return "ok"
 end run
+
+-- Is the row still in the sidebar? Used to confirm an eject really took.
+on rowStillPresent(targetName)
+	try
+		tell application "System Events"
+			tell process "Finder"
+				if (count of windows) is 0 then return false
+				set sb to my findSidebarOutline(window 1)
+				if sb is missing value then return false
+				repeat with r in (rows of sb)
+					if my nameOfRow(r) is targetName then return true
+				end repeat
+			end tell
+		end tell
+	end try
+	return false
+end rowStillPresent
 
 -- A window that has just been created is not usable the instant it exists: its
 -- sidebar is populated a moment later. Asking immediately is what made the
