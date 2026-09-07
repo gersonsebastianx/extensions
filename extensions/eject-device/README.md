@@ -46,7 +46,8 @@ locally.
 ## Notes and limits
 
 - **The sidebar lives inside a window.** If no Finder window is open, the extension opens one
-  and closes it again afterwards.
+  and closes it again afterwards. A window is not usable the instant it exists, so the scripts
+  poll for a sidebar that has rows before reading it.
 - **Ejecting a device is not required for safety.** Unlike a USB drive, an iPhone can be
   unplugged at any time. The eject button just ends Finder's session with it.
 - **A device synced over Wi-Fi** appears in the sidebar and can be ejected, even though it will

@@ -21,7 +21,7 @@ on run argv
 	tell application "System Events"
 		if not (exists process "Finder") then error "Finder is not running."
 		tell process "Finder"
-			set sidebarOutline to my findSidebarOutline(window 1)
+			set sidebarOutline to my waitForSidebar()
 			if sidebarOutline is missing value then error "Could not locate the Finder sidebar."
 
 			repeat with theRow in (rows of sidebarOutline)
@@ -68,7 +68,7 @@ on run argv
 		end tell
 	end tell
 
-	if didOpenWindow and ejected then
+	if didOpenWindow then
 		try
 			delay 0.5
 			tell application "Finder" to close front Finder window
@@ -78,6 +78,30 @@ on run argv
 	if not ejected then error "Could not find \"" & targetName & "\" in the Finder sidebar."
 	return "ok"
 end run
+
+-- A window that has just been created is not usable the instant it exists: its
+-- sidebar is populated a moment later. Asking immediately is what made the
+-- first eject after opening the command fail while a second one worked -- the
+-- failed attempt left a window behind for the retry to find. So poll for a
+-- sidebar that actually has rows, rather than assuming one is there.
+on waitForSidebar()
+	repeat 40 times
+		try
+			tell application "System Events"
+				tell process "Finder"
+					if (count of windows) > 0 then
+						set candidate to my findSidebarOutline(window 1)
+						if candidate is not missing value then
+							if (count of rows of candidate) > 0 then return candidate
+						end if
+					end if
+				end tell
+			end tell
+		end try
+		delay 0.1
+	end repeat
+	return missing value
+end waitForSidebar
 
 on findSidebarOutline(theWindow)
 	tell application "System Events"

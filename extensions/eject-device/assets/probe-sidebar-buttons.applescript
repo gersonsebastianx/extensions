@@ -12,18 +12,27 @@ set out to {}
 
 tell application "System Events"
 	tell process "Finder"
+		-- Poll: a freshly created Finder window has no sidebar for a moment.
 		set sb to missing value
-		try
-			set sb to outline 1 of scroll area 1 of splitter group 1 of window 1
-		end try
-		if sb is missing value then
-			repeat with el in (entire contents of window 1)
-				if class of el is outline then
-					set sb to el
-					exit repeat
-				end if
-			end repeat
-		end if
+		repeat 40 times
+			try
+				set sb to outline 1 of scroll area 1 of splitter group 1 of window 1
+			end try
+			if sb is missing value then
+				try
+					repeat with el in (entire contents of window 1)
+						if class of el is outline then
+							set sb to el
+							exit repeat
+						end if
+					end repeat
+				end try
+			end if
+			if sb is not missing value then
+				if (count of rows of sb) > 0 then exit repeat
+			end if
+			delay 0.1
+		end repeat
 		if sb is missing value then error "No encuentro la barra lateral"
 
 		repeat with r in (rows of sb)
