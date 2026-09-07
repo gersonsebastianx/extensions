@@ -11,4 +11,5 @@
 - Add a detail panel with capacity, free space, format, connection and mount point
 - Remove an ejected row immediately rather than waiting for a reload
 - Confirm "Eject All Disks" against the names of everything it is about to touch
-- Add "Diagnose Finder Sidebar" to troubleshoot detection on unfamiliar macOS layouts
+- Classify permission errors by numeric code, so they are recognised in any language
+- Add "Diagnose Finder Sidebar", reporting each sidebar row's buttons, to troubleshoot detection

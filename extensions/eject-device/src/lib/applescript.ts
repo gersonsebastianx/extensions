@@ -21,19 +21,32 @@ export async function runScript(name: string, args: string[] = [], timeout = 20_
   return stdout.trim();
 }
 
+/** Apple event denied: Raycast may not talk to Finder or System Events at all. */
+const AUTOMATION_ERROR_CODES = ["-1743"];
+
+/**
+ * Assistive access denied. macOS reports this as -1719 or -25211 depending on
+ * the release, and both turn up in the wild.
+ */
+const ACCESSIBILITY_ERROR_CODES = ["-1719", "-25211"];
+
 /**
  * Maps an osascript failure onto the permission the user actually has to grant.
- * -1743 is Automation (Apple events), -25211 is Accessibility (UI scripting);
- * they live in different panes of System Settings, so telling them apart is the
- * difference between a two-click fix and a confusing dead end.
+ * Automation and Accessibility live in different panes of System Settings, so
+ * telling them apart is the difference between a two-click fix and a dead end.
+ *
+ * Matching is on the numeric code rather than the message: macOS localises the
+ * text, so an English substring silently fails to classify anything on a Mac
+ * that is not running in English -- which is precisely the case where a user
+ * most needs to be pointed at the right pane.
  */
 export function classifyScriptError(error: unknown): SidebarStatus {
   const message = error instanceof Error ? error.message : String(error);
 
-  if (message.includes("-1743") || message.includes("Not authorized to send Apple events")) {
+  if (AUTOMATION_ERROR_CODES.some((code) => message.includes(code))) {
     return { state: "automation-denied", message };
   }
-  if (message.includes("-25211") || message.includes("not allowed assistive access")) {
+  if (ACCESSIBILITY_ERROR_CODES.some((code) => message.includes(code))) {
     return { state: "accessibility-denied", message };
   }
   return { state: "error", message };

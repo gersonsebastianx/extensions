@@ -32,6 +32,16 @@ export async function ejectSidebarItem(name: string): Promise<void> {
   await runScript("eject-sidebar-item.applescript", [name], 60_000);
 }
 
+/** Reports each sidebar row's buttons, to tell an eject button from a sync one. */
+export async function probeSidebarButtons(): Promise<{ probe: string; status: SidebarStatus }> {
+  try {
+    const probe = await runScript("probe-sidebar-buttons.applescript", [], 60_000);
+    return { probe, status: { state: "ok" } };
+  } catch (error) {
+    return { probe: "", status: classifyScriptError(error) };
+  }
+}
+
 /** Dumps the accessibility tree of the front Finder window for troubleshooting. */
 export async function dumpSidebarTree(): Promise<{ dump: string; status: SidebarStatus }> {
   try {

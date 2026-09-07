@@ -2,7 +2,7 @@ import { Action, ActionPanel, Detail, Icon } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
 
 import { ACCESSIBILITY_SETTINGS_URL, AUTOMATION_SETTINGS_URL } from "./lib/applescript";
-import { dumpSidebarTree, readSidebar } from "./lib/sidebar";
+import { dumpSidebarTree, probeSidebarButtons, readSidebar } from "./lib/sidebar";
 import { listConnectedIosDevices } from "./lib/usb";
 import { listAllEjectableVolumes } from "./lib/volumes";
 
@@ -14,13 +14,14 @@ import { listAllEjectableVolumes } from "./lib/volumes";
  */
 export default function Command() {
   const { data, isLoading, revalidate } = usePromise(async () => {
-    const [sidebar, tree, volumes, devices] = await Promise.all([
+    const [sidebar, buttons, tree, volumes, devices] = await Promise.all([
       readSidebar(),
+      probeSidebarButtons(),
       dumpSidebarTree(),
       listAllEjectableVolumes(),
       listConnectedIosDevices(),
     ]);
-    return { sidebar, tree, volumes, devices };
+    return { sidebar, buttons, tree, volumes, devices };
   });
 
   return (
@@ -41,13 +42,14 @@ export default function Command() {
 
 interface Report {
   sidebar: Awaited<ReturnType<typeof readSidebar>>;
+  buttons: Awaited<ReturnType<typeof probeSidebarButtons>>;
   tree: Awaited<ReturnType<typeof dumpSidebarTree>>;
   volumes: Awaited<ReturnType<typeof listAllEjectableVolumes>>;
   devices: Awaited<ReturnType<typeof listConnectedIosDevices>>;
 }
 
 function renderReport(data: Report): string {
-  const { sidebar, tree, volumes, devices } = data;
+  const { sidebar, buttons, tree, volumes, devices } = data;
 
   const lines = [
     "# Finder Sidebar Diagnostics",
@@ -60,6 +62,13 @@ function renderReport(data: Report): string {
     sidebar.rows.length === 0
       ? "_No rows read. The sidebar could not be reached._"
       : sidebar.rows.map((row) => `- ${row.ejectable ? "⏏︎" : "  "} \`${row.name}\``).join("\n"),
+    "",
+    "## Sidebar buttons",
+    "",
+    "Which button sits on which row. An eject button and an iCloud sync button both",
+    "count as buttons, so this is what separates them.",
+    "",
+    buttons.status.state === "ok" ? "```\n" + buttons.probe + "\n```" : `_Unavailable: ${buttons.status.message}_`,
     "",
     "## Ejectable volumes (diskutil + network mounts)",
     "",
