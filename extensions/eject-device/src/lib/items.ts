@@ -1,9 +1,9 @@
 import { getPreferenceValues } from "@raycast/api";
 
-import { readSidebar, ejectSidebarItem } from "./sidebar";
+import { readSidebar, ejectSidebarItem, SidebarRow } from "./sidebar";
 import { listEjectableVolumes, ejectVolume } from "./volumes";
 import { listConnectedIosDevices } from "./usb";
-import { Ejectable, Preferences, SidebarStatus } from "./types";
+import { Ejectable, Preferences, SidebarStatus, UsbDevice } from "./types";
 
 export interface EjectableList {
   items: Ejectable[];
@@ -29,7 +29,7 @@ export async function loadEjectables(): Promise<EjectableList> {
   const items: Ejectable[] = [];
 
   for (const row of sidebar.rows) {
-    if (!row.ejectable) continue;
+    if (!isEjectableRow(row, iosDevices)) continue;
 
     const volume = volumesByName.get(row.name);
     if (volume) {
@@ -75,6 +75,20 @@ export async function eject(item: Ejectable): Promise<void> {
     return;
   }
   await ejectSidebarItem(item.name);
+}
+
+/**
+ * A row qualifies when Finder draws an eject button next to it. That button is
+ * not exposed to the accessibility API on every macOS release -- on some it
+ * only materialises once the row is selected -- so a row whose name carries the
+ * model of a device currently on the USB bus counts as well: "iPad de Gerson"
+ * against an "iPad". Without this second route a sidebar that hides the button
+ * collapses into an empty list, which reads exactly like a device that was
+ * never detected.
+ */
+function isEjectableRow(row: SidebarRow, iosDevices: UsbDevice[]): boolean {
+  if (row.ejectable) return true;
+  return iosDevices.some((device) => row.name.toLowerCase().includes(device.name.toLowerCase()));
 }
 
 /**
