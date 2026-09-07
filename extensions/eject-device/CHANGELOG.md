@@ -11,7 +11,8 @@
 - Add a detail panel with capacity, free space, format, connection and mount point
 - Remove an ejected row immediately rather than waiting for a reload
 - Confirm "Eject All Disks" against the names of everything it is about to touch
-- Eject through the accessibility action, so a device ejects without its row being selected
+- Eject the way a person does: Finder in front, row selected, then the eject button
+- Say when a device came straight back because it is also visible over Wi-Fi
 - Stop reopening a Finder window after every eject
 - Confirm an ejected item actually left the sidebar, instead of trusting the click
 - Show why a script failed rather than the command line that failed

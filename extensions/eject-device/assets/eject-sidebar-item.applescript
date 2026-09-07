@@ -16,91 +16,138 @@ on run argv
 		end if
 	end tell
 
-	set sidebarOutline to my waitForSidebar()
-	if sidebarOutline is missing value then
-		my closeWindowIfOpened(didOpenWindow)
+	if my waitForSidebar() is missing value then
+		my restore(didOpenWindow, missing value)
 		error "Could not locate the Finder sidebar."
 	end if
 
-	set theRow to my findRow(sidebarOutline, targetName)
-	if theRow is missing value then
-		my closeWindowIfOpened(didOpenWindow)
+	if my findRow(targetName) is missing value then
+		my restore(didOpenWindow, missing value)
 		error "\"" & targetName & "\" is no longer in the Finder sidebar."
 	end if
 
-	-- Three ways in, in order of how little they disturb the user, each checked
-	-- before moving on. The accessibility action goes first because it does not
-	-- depend on the arrow being drawn -- Finder only renders it under the cursor
-	-- or on the selected row, so a positional click on any other row lands on
-	-- nothing and reports success exactly like a click that worked.
+	-- Reproduce what a person does as closely as possible: Finder in front, the
+	-- row selected -- which is what makes Finder draw the eject arrow at all --
+	-- and only then the button. Whoever was in front is put back at the end.
+	set previousApp to my frontmostApp()
+	try
+		tell application "Finder" to activate
+	end try
+	delay 0.3
+
 	set attempted to false
+	set cameBack to false
 
-	if my pressEjectButton(theRow) then
-		set attempted to true
-		if my waitForRowToGo(targetName) then return my finish(didOpenWindow)
-	end if
+	repeat with strategy from 1 to 3
+		-- The row is looked up again every time. A reference taken before an
+		-- attempt can be dead after it, and every call here is inside a try, so
+		-- a dead one would fail silently and the later strategies would quietly
+		-- do nothing at all.
+		set theRow to my findRow(targetName)
+		if theRow is missing value then exit repeat
 
-	-- Selecting the row makes Finder draw the arrow, so now a real click has
-	-- something to hit.
-	my selectRow(theRow)
-	if my pressEjectButton(theRow) then
-		set attempted to true
-		if my waitForRowToGo(targetName) then return my finish(didOpenWindow)
-	end if
+		my selectRow(theRow)
 
-	-- Last resort: Finder's own Eject command. This one needs Finder in front,
-	-- so it is only worth the interruption once the quieter routes have failed.
-	if my ejectViaMenu(theRow) then
-		set attempted to true
-		if my waitForRowToGo(targetName) then return my finish(didOpenWindow)
-	end if
+		set didAct to false
+		if strategy is 1 then
+			set didAct to my pressEjectButton(theRow, "AXPress")
+		else if strategy is 2 then
+			set didAct to my pressEjectButton(theRow, "click")
+		else
+			set didAct to my ejectViaKeystroke()
+		end if
 
-	my closeWindowIfOpened(didOpenWindow)
+		if didAct then
+			set attempted to true
+			set outcome to my watchRow(targetName)
+			if outcome is "gone" then
+				my restore(didOpenWindow, previousApp)
+				return "ok"
+			end if
+			if outcome is "returned" then set cameBack to true
+		end if
+	end repeat
+
+	my restore(didOpenWindow, previousApp)
+
 	if not attempted then error "Found \"" & targetName & "\" but it has no eject button."
-	error "Finder would not let go of \"" & targetName & "\". It may be syncing or otherwise busy."
+	if cameBack then
+		error "\"" & targetName & "\" was ejected and Finder listed it again straight away. A device that is also visible over Wi-Fi comes back on its own; turn off \"Show this device when on Wi-Fi\" in its Finder settings to eject it for good."
+	end if
+	error "Finder would not let go of \"" & targetName & "\". It may be syncing, backing up, or otherwise busy."
 end run
 
-on finish(didOpenWindow)
-	my closeWindowIfOpened(didOpenWindow)
-	return "ok"
-end finish
+-- Watches what happens to the row: "gone" if it left and stayed gone,
+-- "returned" if it left and Finder put it back, "stayed" if it never moved.
+-- The difference matters: a row that comes back is not a bug in the click.
+on watchRow(targetName)
+	set wentAway to false
+	repeat 15 times
+		delay 0.2
+		if my rowStillPresent(targetName) then
+			if wentAway then return "returned"
+		else
+			set wentAway to true
+		end if
+	end repeat
+	if wentAway then return "gone"
+	return "stayed"
+end watchRow
 
-on closeWindowIfOpened(didOpenWindow)
+on restore(didOpenWindow, previousApp)
 	if didOpenWindow then
 		try
 			tell application "Finder" to close front Finder window
 		end try
 	end if
-end closeWindowIfOpened
+	try
+		if previousApp is not missing value then tell application previousApp to activate
+	end try
+end restore
 
-on findRow(sidebarOutline, targetName)
-	tell application "System Events"
-		try
-			repeat with theRow in (rows of sidebarOutline)
-				if my nameOfRow(theRow) is targetName then return theRow
-			end repeat
-		end try
-	end tell
+on frontmostApp()
+	try
+		tell application "System Events" to return name of first application process whose frontmost is true
+	end try
+	return missing value
+end frontmostApp
+
+on findRow(targetName)
+	try
+		tell application "System Events"
+			tell process "Finder"
+				if (count of windows) is 0 then return missing value
+				set sb to my findSidebarOutline(window 1)
+				if sb is missing value then return missing value
+				repeat with r in (rows of sb)
+					if my nameOfRow(r) is targetName then return r
+				end repeat
+			end tell
+		end tell
+	end try
 	return missing value
 end findRow
 
 -- Presses the row's eject button, which is the one carrying a title; an
--- untitled button on the same row belongs to iCloud sync. The accessibility
--- action is tried before a click because it does not care where the button is
--- drawn, or whether it is drawn at all.
-on pressEjectButton(theRow)
+-- untitled button on the same row belongs to iCloud sync. "AXPress" invokes the
+-- accessibility action, which does not care whether the arrow is drawn; "click"
+-- synthesizes a press at its position, which does.
+on pressEjectButton(theRow, how)
 	tell application "System Events"
 		try
 			repeat with b in (buttons of UI element 1 of theRow)
 				if my hasTitle(b) then
-					try
-						perform action "AXPress" of b
-						return true
-					end try
-					try
-						click b
-						return true
-					end try
+					if how is "AXPress" then
+						try
+							perform action "AXPress" of b
+							return true
+						end try
+					else
+						try
+							click b
+							return true
+						end try
+					end if
 				end if
 			end repeat
 		end try
@@ -115,44 +162,23 @@ on selectRow(theRow)
 	end try
 end selectRow
 
-on ejectViaMenu(theRow)
+-- Finder's own Eject command. Only reports success if the keystroke was
+-- actually delivered to Finder while it was frontmost.
+on ejectViaKeystroke()
 	try
-		my selectRow(theRow)
-		tell application "Finder" to activate
-		delay 0.4
-		tell application "System Events" to keystroke "e" using command down
+		tell application "System Events"
+			if not (frontmost of application process "Finder") then return false
+			keystroke "e" using command down
+		end tell
 		return true
 	end try
 	return false
-end ejectViaMenu
+end ejectViaKeystroke
 
--- Watches the row leave. Success is only reported once it has.
-on waitForRowToGo(targetName)
-	repeat 10 times
-		delay 0.2
-		if not my rowStillPresent(targetName) then return true
-	end repeat
-	return false
-end waitForRowToGo
-
--- Returns true when the row is still there, and also when it cannot be checked
--- at all: an unverifiable eject has to count as one that did not happen, or the
--- extension goes back to announcing successes it has not confirmed.
+-- True when the row is still there, and also when it cannot be checked at all:
+-- an unverifiable eject counts as one that did not happen.
 on rowStillPresent(targetName)
-	try
-		tell application "System Events"
-			tell process "Finder"
-				if (count of windows) is 0 then return true
-				set sb to my findSidebarOutline(window 1)
-				if sb is missing value then return true
-				repeat with r in (rows of sb)
-					if my nameOfRow(r) is targetName then return true
-				end repeat
-			end tell
-		end tell
-		return false
-	end try
-	return true
+	return my findRow(targetName) is not missing value
 end rowStillPresent
 
 -- A window that has just been created is not usable the instant it exists: its
