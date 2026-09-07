@@ -2,7 +2,7 @@
 -- clicking the little eject arrow next to an iPhone, iPad or disk.
 --
 -- Usage: osascript eject-sidebar-item.applescript "iPhone de Gerson"
--- Requires Accessibility permission for Raycast.
+-- Requires Automation and Accessibility permission for the calling app.
 
 on run argv
 	if (count of argv) is 0 then error "Missing the name of the item to eject."
@@ -16,108 +16,147 @@ on run argv
 		end if
 	end tell
 
-	set foundRow to false
-	set clicked to false
-
-	tell application "System Events"
-		if not (exists process "Finder") then error "Finder is not running."
-		tell process "Finder"
-			set sidebarOutline to my waitForSidebar()
-			if sidebarOutline is missing value then error "Could not locate the Finder sidebar."
-
-			repeat with theRow in (rows of sidebarOutline)
-				if my nameOfRow(theRow) is targetName then
-					set foundRow to true
-					-- Preferred route: click the row's own eject button. It does not
-					-- steal focus and it is exactly what a click in Finder does.
-					-- The eject button is the one carrying a title; a row can also
-					-- hold an untitled iCloud sync button, and clicking that would
-					-- evict the user's files from local storage instead.
-					try
-						repeat with b in (buttons of UI element 1 of theRow)
-							if my hasTitle(b) then
-								click b
-								set clicked to true
-								exit repeat
-							end if
-						end repeat
-					end try
-					if not clicked then
-						try
-							repeat with b in (buttons of theRow)
-								if my hasTitle(b) then
-									click b
-									set ejected to true
-									exit repeat
-								end if
-							end repeat
-						end try
-					end if
-					-- Fallback: select the row and press Command-E. Keystrokes go to
-					-- the front app, so Finder has to come forward for this one.
-					if not clicked then
-						try
-							set selected of theRow to true
-							tell application "Finder" to activate
-							delay 0.3
-							keystroke "e" using command down
-							set clicked to true
-						end try
-					end if
-					exit repeat
-				end if
-			end repeat
-		end tell
-	end tell
-
-	-- A click that lands on nothing looks exactly like one that works, so the
-	-- row has to be seen leaving before this reports success. Announcing an
-	-- eject that did not happen is worse than reporting the failure.
-	set confirmed to false
-	if clicked then
-		repeat 25 times
-			delay 0.2
-			if not my rowStillPresent(targetName) then
-				set confirmed to true
-				exit repeat
-			end if
-		end repeat
+	set sidebarOutline to my waitForSidebar()
+	if sidebarOutline is missing value then
+		my closeWindowIfOpened(didOpenWindow)
+		error "Could not locate the Finder sidebar."
 	end if
 
+	set theRow to my findRow(sidebarOutline, targetName)
+	if theRow is missing value then
+		my closeWindowIfOpened(didOpenWindow)
+		error "\"" & targetName & "\" is no longer in the Finder sidebar."
+	end if
+
+	-- Three ways in, in order of how little they disturb the user, each checked
+	-- before moving on. The accessibility action goes first because it does not
+	-- depend on the arrow being drawn -- Finder only renders it under the cursor
+	-- or on the selected row, so a positional click on any other row lands on
+	-- nothing and reports success exactly like a click that worked.
+	set attempted to false
+
+	if my pressEjectButton(theRow) then
+		set attempted to true
+		if my waitForRowToGo(targetName) then return my finish(didOpenWindow)
+	end if
+
+	-- Selecting the row makes Finder draw the arrow, so now a real click has
+	-- something to hit.
+	my selectRow(theRow)
+	if my pressEjectButton(theRow) then
+		set attempted to true
+		if my waitForRowToGo(targetName) then return my finish(didOpenWindow)
+	end if
+
+	-- Last resort: Finder's own Eject command. This one needs Finder in front,
+	-- so it is only worth the interruption once the quieter routes have failed.
+	if my ejectViaMenu(theRow) then
+		set attempted to true
+		if my waitForRowToGo(targetName) then return my finish(didOpenWindow)
+	end if
+
+	my closeWindowIfOpened(didOpenWindow)
+	if not attempted then error "Found \"" & targetName & "\" but it has no eject button."
+	error "Finder would not let go of \"" & targetName & "\". It may be syncing or otherwise busy."
+end run
+
+on finish(didOpenWindow)
+	my closeWindowIfOpened(didOpenWindow)
+	return "ok"
+end finish
+
+on closeWindowIfOpened(didOpenWindow)
 	if didOpenWindow then
 		try
 			tell application "Finder" to close front Finder window
 		end try
 	end if
+end closeWindowIfOpened
 
-	if not foundRow then error "\"" & targetName & "\" is no longer in the Finder sidebar."
-	if not clicked then error "Found \"" & targetName & "\" but it has no eject button."
-	if not confirmed then error "Clicked eject on \"" & targetName & "\" but Finder still lists it."
-	return "ok"
-end run
+on findRow(sidebarOutline, targetName)
+	tell application "System Events"
+		try
+			repeat with theRow in (rows of sidebarOutline)
+				if my nameOfRow(theRow) is targetName then return theRow
+			end repeat
+		end try
+	end tell
+	return missing value
+end findRow
 
--- Is the row still in the sidebar? Used to confirm an eject really took.
+-- Presses the row's eject button, which is the one carrying a title; an
+-- untitled button on the same row belongs to iCloud sync. The accessibility
+-- action is tried before a click because it does not care where the button is
+-- drawn, or whether it is drawn at all.
+on pressEjectButton(theRow)
+	tell application "System Events"
+		try
+			repeat with b in (buttons of UI element 1 of theRow)
+				if my hasTitle(b) then
+					try
+						perform action "AXPress" of b
+						return true
+					end try
+					try
+						click b
+						return true
+					end try
+				end if
+			end repeat
+		end try
+	end tell
+	return false
+end pressEjectButton
+
+on selectRow(theRow)
+	try
+		tell application "System Events" to set selected of theRow to true
+		delay 0.3
+	end try
+end selectRow
+
+on ejectViaMenu(theRow)
+	try
+		my selectRow(theRow)
+		tell application "Finder" to activate
+		delay 0.4
+		tell application "System Events" to keystroke "e" using command down
+		return true
+	end try
+	return false
+end ejectViaMenu
+
+-- Watches the row leave. Success is only reported once it has.
+on waitForRowToGo(targetName)
+	repeat 10 times
+		delay 0.2
+		if not my rowStillPresent(targetName) then return true
+	end repeat
+	return false
+end waitForRowToGo
+
+-- Returns true when the row is still there, and also when it cannot be checked
+-- at all: an unverifiable eject has to count as one that did not happen, or the
+-- extension goes back to announcing successes it has not confirmed.
 on rowStillPresent(targetName)
 	try
 		tell application "System Events"
 			tell process "Finder"
-				if (count of windows) is 0 then return false
+				if (count of windows) is 0 then return true
 				set sb to my findSidebarOutline(window 1)
-				if sb is missing value then return false
+				if sb is missing value then return true
 				repeat with r in (rows of sb)
 					if my nameOfRow(r) is targetName then return true
 				end repeat
 			end tell
 		end tell
+		return false
 	end try
-	return false
+	return true
 end rowStillPresent
 
 -- A window that has just been created is not usable the instant it exists: its
--- sidebar is populated a moment later. Asking immediately is what made the
--- first eject after opening the command fail while a second one worked -- the
--- failed attempt left a window behind for the retry to find. So poll for a
--- sidebar that actually has rows, rather than assuming one is there.
+-- sidebar is populated a moment later. Poll for one that actually has rows.
 on waitForSidebar()
 	repeat 40 times
 		try
@@ -154,14 +193,6 @@ on findSidebarOutline(theWindow)
 	return missing value
 end findSidebarOutline
 
-on hasTitle(theButton)
-	set theTitle to ""
-	try
-		tell application "System Events" to set theTitle to (title of theButton) as text
-	end try
-	return theTitle is not ""
-end hasTitle
-
 on nameOfRow(theRow)
 	tell application "System Events"
 		try
@@ -176,3 +207,11 @@ on nameOfRow(theRow)
 	end tell
 	return ""
 end nameOfRow
+
+on hasTitle(theButton)
+	set theTitle to ""
+	try
+		tell application "System Events" to set theTitle to (title of theButton) as text
+	end try
+	return theTitle is not ""
+end hasTitle

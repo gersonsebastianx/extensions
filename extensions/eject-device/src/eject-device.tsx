@@ -44,6 +44,12 @@ export default function Command() {
     try {
       // Drop the row as soon as the eject starts. Waiting for a reload before
       // the list reflects the action makes a successful eject feel broken.
+      //
+      // No reload afterwards: reading the sidebar needs a Finder window, and
+      // one is opened and closed for the purpose whenever none exists. Doing
+      // that on every eject made Finder flash open repeatedly, which is worse
+      // than a list that is momentarily stale -- and it is not stale either
+      // way, since success removes the row and failure puts it back.
       await mutate(eject(item), {
         optimisticUpdate: (current: EjectableList | undefined): EjectableList => ({
           status: current?.status ?? { state: "ok" },
@@ -51,6 +57,7 @@ export default function Command() {
           items: (current?.items ?? []).filter((other) => other.id !== item.id),
         }),
         rollbackOnError: true,
+        shouldRevalidateAfter: false,
       });
       toast.style = Toast.Style.Success;
       toast.title = `Ejected ${item.name}`;

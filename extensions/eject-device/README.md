@@ -48,6 +48,12 @@ locally.
 - **The sidebar lives inside a window.** If no Finder window is open, the extension opens one
   and closes it again afterwards. A window is not usable the instant it exists, so the scripts
   poll for a sidebar that has rows before reading it.
+- **Finder only draws the eject arrow on the row under the cursor or the selected one.** A
+  positional click on any other row lands on nothing and looks exactly like a click that
+  worked, so the eject goes through the button's accessibility action instead, which does not
+  care whether the arrow is drawn. If that does not move the device, the row is selected and
+  clicked, and finally Finder's own Eject command is used -- each checked before the next, and
+  none of them reporting success until the row is seen leaving.
 - **Ejecting a device is not required for safety.** Unlike a USB drive, an iPhone can be
   unplugged at any time. The eject button just ends Finder's session with it.
 - **A device synced over Wi-Fi** appears in the sidebar and can be ejected, even though it will
