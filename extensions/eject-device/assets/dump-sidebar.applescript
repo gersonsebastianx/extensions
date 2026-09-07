@@ -27,8 +27,13 @@ on run
 					end if
 					set elementClass to "?"
 					try
-						set elementClass to (class of anElement) as text
+						set elementClass to (role of anElement) as text
 					end try
+					if elementClass is "?" then
+						try
+							set elementClass to (class of anElement) as text
+						end try
+					end if
 					set elementLabel to ""
 					try
 						set elementLabel to (value of anElement) as text

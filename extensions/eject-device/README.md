@@ -56,6 +56,11 @@ locally.
 - **The accessibility tree has changed shape between macOS releases.** The scripts try the known
   layouts first and then fall back to walking the whole window, but a release that moves things
   again will need the diagnose command's output to fix.
+- **Not every button in the sidebar ejects.** An iCloud folder such as Desktop or Documents
+  carries a sync button, and clicking it evicts local copies of files. Rows are matched on
+  carrying a button with a _title_, which is what Finder gives the eject arrow and withholds
+  from the sync one. The check is for the title's presence, never its wording, so it holds in
+  every language.
 
 ## Assets
 

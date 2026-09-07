@@ -3,6 +3,7 @@
 -- ejectable: iPhones, iPads, external disks, disk images and network shares.
 --
 -- Output: one row per line, "name<TAB>1" (ejectable) or "name<TAB>0".
+-- A row counts as ejectable when it carries a button with a title; see below.
 -- Requires Accessibility permission for Raycast.
 
 on run
@@ -82,14 +83,33 @@ on nameOfRow(theRow)
 	return ""
 end nameOfRow
 
+-- Finder puts a button on rows that have nothing to eject: an iCloud folder
+-- carries a sync button, whose title is empty and whose description is the
+-- generic "button". The eject button is the one that carries a title --
+-- "Eject", "Expulsar", and so on. Testing that a title exists, rather than
+-- what it says, keeps this working in every language macOS ships in.
 on ejectFlagOfRow(theRow)
 	tell application "System Events"
 		try
-			if (count of buttons of UI element 1 of theRow) > 0 then return "1"
+			repeat with b in (buttons of UI element 1 of theRow)
+				if my hasTitle(b) then return "1"
+			end repeat
 		end try
 		try
-			if (count of buttons of theRow) > 0 then return "1"
+			repeat with b in (buttons of theRow)
+				if my hasTitle(b) then return "1"
+			end repeat
 		end try
 	end tell
 	return "0"
 end ejectFlagOfRow
+
+-- A missing title reads as `missing value`, which is not the empty string, so
+-- it has to be coerced inside a try rather than compared directly.
+on hasTitle(theButton)
+	set theTitle to ""
+	try
+		tell application "System Events" to set theTitle to (title of theButton) as text
+	end try
+	return theTitle is not ""
+end hasTitle

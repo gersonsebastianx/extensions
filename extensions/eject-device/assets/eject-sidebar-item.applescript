@@ -28,14 +28,27 @@ on run argv
 				if my nameOfRow(theRow) is targetName then
 					-- Preferred route: click the row's own eject button. It does not
 					-- steal focus and it is exactly what a click in Finder does.
+					-- The eject button is the one carrying a title; a row can also
+					-- hold an untitled iCloud sync button, and clicking that would
+					-- evict the user's files from local storage instead.
 					try
-						click button 1 of UI element 1 of theRow
-						set ejected to true
+						repeat with b in (buttons of UI element 1 of theRow)
+							if my hasTitle(b) then
+								click b
+								set ejected to true
+								exit repeat
+							end if
+						end repeat
 					end try
 					if not ejected then
 						try
-							click button 1 of theRow
-							set ejected to true
+							repeat with b in (buttons of theRow)
+								if my hasTitle(b) then
+									click b
+									set ejected to true
+									exit repeat
+								end if
+							end repeat
 						end try
 					end if
 					-- Fallback: select the row and press Command-E. Keystrokes go to
@@ -82,6 +95,14 @@ on findSidebarOutline(theWindow)
 	end tell
 	return missing value
 end findSidebarOutline
+
+on hasTitle(theButton)
+	set theTitle to ""
+	try
+		tell application "System Events" to set theTitle to (title of theButton) as text
+	end try
+	return theTitle is not ""
+end hasTitle
 
 on nameOfRow(theRow)
 	tell application "System Events"

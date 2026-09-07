@@ -3,7 +3,11 @@ import { SidebarStatus } from "./types";
 
 export interface SidebarRow {
   name: string;
-  /** Finder draws an eject arrow next to it, so Finder considers it ejectable. */
+  /**
+   * The row carries a button with a title, which is how Finder marks an eject
+   * arrow. Rows can hold untitled buttons that eject nothing -- an iCloud
+   * folder has a sync button -- so the title, not the button, is the signal.
+   */
   ejectable: boolean;
 }
 

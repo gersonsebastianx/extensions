@@ -11,5 +11,6 @@
 - Add a detail panel with capacity, free space, format, connection and mount point
 - Remove an ejected row immediately rather than waiting for a reload
 - Confirm "Eject All Disks" against the names of everything it is about to touch
+- Tell an eject button from an iCloud sync button, so folders never offer to eject
 - Classify permission errors by numeric code, so they are recognised in any language
 - Add "Diagnose Finder Sidebar", reporting each sidebar row's buttons, to troubleshoot detection

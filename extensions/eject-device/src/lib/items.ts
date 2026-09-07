@@ -78,13 +78,10 @@ export async function eject(item: Ejectable): Promise<void> {
 }
 
 /**
- * A row qualifies when Finder draws an eject button next to it. That button is
- * not exposed to the accessibility API on every macOS release -- on some it
- * only materialises once the row is selected -- so a row whose name carries the
- * model of a device currently on the USB bus counts as well: "iPad de Gerson"
- * against an "iPad". Without this second route a sidebar that hides the button
- * collapses into an empty list, which reads exactly like a device that was
- * never detected.
+ * A row qualifies when it carries a titled button, which is how Finder marks
+ * something as ejectable. A row whose name carries the model of a device on the
+ * USB bus counts too, as a safety net for a macOS release that stops exposing
+ * those titles -- disks would survive that through diskutil, devices would not.
  */
 function isEjectableRow(row: SidebarRow, iosDevices: UsbDevice[]): boolean {
   if (row.ejectable) return true;
